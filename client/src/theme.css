@@ -1,0 +1,145 @@
+/* Web-font slot: uncomment the line below and put your font there. A web-font
+   @import must come before the Tailwind import — an @import placed after any
+   other rule is a build error, and it is reported against a line number in the
+   expanded Tailwind output, far past the end of this file, so the message
+   cannot point you at the mistake. */
+/* @import url('https://fonts.googleapis.com/css2?family=Your+Font:wght@400..700&display=swap'); */
+@import "tailwindcss";
+@import "tailwindcss-safe-area";
+
+@theme {
+  --text-xs: 12px;
+  --text-xs--line-height: 16px;
+  --text-sm: 14px;
+  --text-sm--line-height: 20px;
+  --text-base: 16px;
+  --text-base--line-height: 24px;
+  --text-lg: 18px;
+  --text-lg--line-height: 28px;
+  --text-xl: 20px;
+  --text-xl--line-height: 28px;
+  --text-2xl: 24px;
+  --text-2xl--line-height: 32px;
+  --text-3xl: 30px;
+  --text-3xl--line-height: 36px;
+  --text-4xl: 36px;
+  --text-4xl--line-height: 40px;
+  --text-5xl: 48px;
+  --text-5xl--line-height: 52px;
+}
+
+:root {
+  color-scheme: light dark;
+  --bg: #fdf6ec;
+  --surface: #fffaf1;
+  --text: #221812;
+  --dim: #7a6a5c;
+  --border: #e8dcc8;
+  --accent: #14532d;
+  --radius: 14px;
+  --space-surface: var(--surface);
+  --space-surface-alt: var(--surface);
+  --space-muted: var(--dim);
+  --space-border: var(--border);
+  --space-accent: var(--accent);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #171008;
+    --surface: #241a10;
+    --text: #fdf3e3;
+    --dim: #b8a58d;
+    --border: #3d2f1f;
+    --accent: #4ade80;
+  }
+}
+
+/* Phone tap targets: at least 32px tall. */
+@layer base {
+  button, [role="button"], select, summary, input:not([type="checkbox"], [type="radio"]) {
+    min-height: 2rem;
+  }
+
+  /* Crisp rendering: smoothed, high-legibility text and clean image edges
+     everywhere, so ranks, names, and portraits read sharp on a phone. */
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  img {
+    -webkit-user-drag: none;
+  }
+}
+
+/* Smooth card-play motion: a played card settles onto the table with a
+   short ease-out drop and fade instead of snapping in. Purely visual —
+   it never delays or changes a play. */
+@keyframes cf-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.cf-card-in {
+  animation: cf-card-in 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform, opacity;
+}
+
+@keyframes cf-bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.cf-bubble-in {
+  animation: cf-bubble-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cf-card-in,
+  .cf-bubble-in {
+    animation: none;
+  }
+}
+
+/* Standalone container styles (previously supplied by @hatch/space-sdk). */
+:root {
+  --twsa-safe-area-inset-top: env(safe-area-inset-top, 0px);
+  --twsa-safe-area-inset-right: env(safe-area-inset-right, 0px);
+  --twsa-safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+  --twsa-safe-area-inset-left: env(safe-area-inset-left, 0px);
+}
+html,
+[data-generated-space-root] {
+  height: 100%;
+  min-height: 100%;
+}
+[data-generated-space-root] {
+  inset: 0;
+  overflow: auto;
+  position: fixed;
+  scrollbar-width: none;
+}
+[data-generated-space-root]::-webkit-scrollbar {
+  display: none;
+}
+.hatch-space-root[data-hatch-space-root] {
+  --hatch-space-bottom-padding: calc(
+    var(--bottom-padding, 0px) + env(safe-area-inset-bottom, 0px)
+  );
+  box-sizing: border-box;
+  min-height: calc(100dvh + var(--hatch-space-bottom-padding));
+  padding-bottom: var(--hatch-space-bottom-padding);
+  background: var(--bg, #f4f7fb);
+  color: var(--text, #0f172a);
+}

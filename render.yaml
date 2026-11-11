@@ -1,0 +1,16 @@
+# Render free web service for C.F.N.B. Cutthroat: Family Card Night.
+# $0 Hobby plan, no card. Sleeps after 15 min idle, ~1 min to wake.
+# DATABASE_URL is set in the Render dashboard from the Neon project,
+# NOT in this file.
+services:
+  - type: web
+    name: cfnb-cutthroat
+    runtime: node
+    plan: free
+    buildCommand: npm install -g bun && bun install && bun run build
+    startCommand: bun ./server/src/server.ts
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
