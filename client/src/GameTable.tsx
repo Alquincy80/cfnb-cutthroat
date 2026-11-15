@@ -21,6 +21,21 @@ import {
 } from "./game";
 import { ChatPanel } from "./ChatPanel";
 import { VoicePanel } from "./VoicePanel";
+import {
+  getMusicEnabled,
+  getSfxEnabled,
+  setMusicEnabled,
+  setSfxEnabled,
+  sfxBid,
+  sfxCardPlay,
+  sfxDeal,
+  sfxGameWin,
+  sfxHandWin,
+  sfxLoseTrick,
+  sfxWinTrick,
+  startMusic,
+  stopMusic,
+} from "./audio";
 
 export interface GameConfig {
   mode: "quick" | "story" | "room";
@@ -364,7 +379,15 @@ export function GameTable({
   const [myReaction, setMyReaction] = useState<string | null>(null);
   const [showChat, setShowChat] = useState(false);
   const [showVoice, setShowVoice] = useState(false);
+  const [musicOn, setMusicOn] = useState(() => getMusicEnabled());
+  const [sfxOn, setSfxOn] = useState(() => getSfxEnabled());
   const endFired = useRef(false);
+
+  // Music must never start on its own (browsers block autoplay) — it only
+  // starts when the player taps the 🎵 button. Stop it when leaving the table.
+  useEffect(() => {
+    return () => stopMusic();
+  }, []);
   const scoresRef = useRef<number[]>(Array(n).fill(0));
   const bubbleTimer = useRef<number | null>(null);
 
@@ -407,6 +430,7 @@ export function GameTable({
     setBubbles({});
     setMyReaction(null);
     scoresRef.current = baseScores;
+    sfxDeal();
   }
 
   useEffect(() => {
@@ -442,9 +466,11 @@ export function GameTable({
   }
 
   function applyBid(player: number, bid: number) {
+    if (musicOn) startMusic();
     const next = [...bids];
     next[player] = bid;
     setBids(next);
+    sfxBid();
     // Expression on every bid — confident, clowning energy
     if (player !== 0) {
       const emojis = ["😏", "😎", "🔥", "👀"];
@@ -461,6 +487,8 @@ export function GameTable({
   }
 
   function applyPlay(player: number, card: CardT) {
+    if (musicOn) startMusic();
+    sfxCardPlay();
     const newHands = hands.map((h, i) =>
       i === player ? h.filter((c) => !(c.suit === card.suit && c.rank === card.rank)) : h,
     );
@@ -480,6 +508,8 @@ export function GameTable({
       setBooks(newBooks);
       setTrick([]);
       setTricksPlayed((t) => t + 1);
+      if (winner === 0) sfxWinTrick();
+      else sfxLoseTrick();
 
       // Winner clowns, a loser reacts — the table feels alive
       const winB = WIN_BUBBLES[Math.floor(Math.random() * WIN_BUBBLES.length)] ?? WIN_BUBBLES[0]!;
@@ -519,9 +549,11 @@ export function GameTable({
       if (!endFired.current) {
         endFired.current = true;
         const winnerIdx = newScores.indexOf(top);
+        if (winnerIdx === 0) sfxGameWin();
         onGameEnd(winnerIdx === 0);
       }
     } else {
+      if ((rows[0]?.points ?? 0) >= 0) sfxHandWin();
       setPhase("handEnd");
     }
   }
@@ -666,28 +698,59 @@ export function GameTable({
               : "Quick Play"}{" "}
           · Hand {handNumber} · First to 150
         </p>
-        {config.mode === "room" && config.roomCode ? (
-          <span className="flex shrink-0 gap-1.5">
-            <button
-              type="button"
-              onClick={() => setShowChat((s) => !s)}
-              className="rounded-full bg-[#14532d] px-3 py-1 text-[13px] font-black text-white shadow"
-              aria-expanded={showChat}
-            >
-              💬 Chat
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowVoice((s) => !s)}
-              className="rounded-full bg-[#14532d] px-3 py-1 text-[13px] font-black text-white shadow"
-              aria-expanded={showVoice}
-            >
-              🎤 Voice
-            </button>
-          </span>
-        ) : (
-          <span className="w-[74px]" />
-        )}
+        <span className="flex shrink-0 gap-1.5">
+          <button
+            type="button"
+            onClick={() => {
+              const next = !musicOn;
+              setMusicOn(next);
+              setMusicEnabled(next);
+              if (next) startMusic();
+              else stopMusic();
+            }}
+            className={`rounded-full px-2.5 py-1 text-[13px] font-black text-white shadow ${musicOn ? "bg-[#14532d]" : "bg-black/55"}`}
+            aria-pressed={musicOn}
+            aria-label={musicOn ? "Turn background music off" : "Turn background music on"}
+            title="Background music"
+          >
+            🎵 Music
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const next = !sfxOn;
+              setSfxOn(next);
+              setSfxEnabled(next);
+              if (next) sfxBid();
+            }}
+            className={`rounded-full px-2.5 py-1 text-[13px] font-black text-white shadow ${sfxOn ? "bg-[#14532d]" : "bg-black/55"}`}
+            aria-pressed={sfxOn}
+            aria-label={sfxOn ? "Turn sound effects off" : "Turn sound effects on"}
+            title="Sound effects"
+          >
+            🔊 SFX
+          </button>
+          {config.mode === "room" && config.roomCode && (
+            <>
+              <button
+                type="button"
+                onClick={() => setShowChat((s) => !s)}
+                className="rounded-full bg-[#14532d] px-3 py-1 text-[13px] font-black text-white shadow"
+                aria-expanded={showChat}
+              >
+                💬 Chat
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowVoice((s) => !s)}
+                className="rounded-full bg-[#14532d] px-3 py-1 text-[13px] font-black text-white shadow"
+                aria-expanded={showVoice}
+              >
+                🎤 Voice
+              </button>
+            </>
+          )}
+        </span>
       </div>
 
       {/* ===== THE TABLE: cream frame, gold trim, deep emerald felt ===== */}
