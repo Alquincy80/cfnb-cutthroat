@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { SafeAreaTopScrim } from "./SafeAreaTopScrim";
 import { api, type ApiResponse } from "./api";
@@ -23,7 +23,10 @@ type View =
   | "store"
   | "rules"
   | "account"
-  | "look";
+  | "look"
+  | "privacy"
+  | "terms"
+  | "safety";
 
 interface GuestProgress {
   chapters: number[];
@@ -281,6 +284,9 @@ export function App() {
             onRules={() => setView("rules")}
             onAccount={() => setView("account")}
             onLook={() => setView("look")}
+            onPrivacy={() => setView("privacy")}
+            onTerms={() => setView("terms")}
+            onSafety={() => setView("safety")}
           />
         )}
         {view === "story" && (
@@ -332,6 +338,7 @@ export function App() {
         {view === "store" && (
           <StoreScreen
             signedIn={signedIn}
+            under13={under13}
             hasPass={hasPass}
             hasNoAds={hasNoAds}
             token={token}
@@ -339,9 +346,22 @@ export function App() {
             onClearNotice={() => setStoreNotice(null)}
             onBack={() => setView("home")}
             onAccount={() => setView("account")}
+            onPrivacy={() => setView("privacy")}
+            onTerms={() => setView("terms")}
+            onSafety={() => setView("safety")}
           />
         )}
-        {view === "rules" && <RulesScreen onBack={() => setView("home")} />}
+        {view === "rules" && (
+          <RulesScreen
+            onBack={() => setView("home")}
+            onPrivacy={() => setView("privacy")}
+            onTerms={() => setView("terms")}
+            onSafety={() => setView("safety")}
+          />
+        )}
+        {view === "privacy" && <PrivacyScreen onBack={() => setView("home")} />}
+        {view === "terms" && <TermsScreen onBack={() => setView("home")} />}
+        {view === "safety" && <SafetyScreen onBack={() => setView("home")} />}
         {view === "account" && (
           <AccountScreen
             prof={prof}
@@ -349,6 +369,9 @@ export function App() {
             guestName={guestName}
             onGuestName={setGuestName}
             onBack={() => setView("home")}
+            onPrivacy={() => setView("privacy")}
+            onTerms={() => setView("terms")}
+            onSafety={() => setView("safety")}
             onSignedIn={(t) => {
               localStorage.setItem(LS_TOKEN, t);
               setToken(t);
@@ -357,6 +380,12 @@ export function App() {
               localStorage.removeItem(LS_TOKEN);
               setToken(null);
               void queryClient.invalidateQueries({ queryKey: ["profile"] });
+            }}
+            onAccountDeleted={() => {
+              localStorage.removeItem(LS_TOKEN);
+              setToken(null);
+              void queryClient.invalidateQueries({ queryKey: ["profile"] });
+              setView("home");
             }}
           />
         )}
@@ -450,6 +479,276 @@ function HouseAd({
   );
 }
 
+// ---------- Safety footer + policy screens ----------
+
+function SafetyLinks(props: {
+  onPrivacy: () => void;
+  onTerms: () => void;
+  onSafety: () => void;
+}) {
+  return (
+    <footer className="mt-6 border-t border-[var(--border)] pt-3 text-center">
+      <p className="text-xs font-semibold text-[var(--dim)]">
+        <button type="button" className="underline" onClick={props.onPrivacy}>
+          Privacy Policy
+        </button>
+        {" · "}
+        <button type="button" className="underline" onClick={props.onTerms}>
+          Terms of Service
+        </button>
+        {" · "}
+        <button type="button" className="underline" onClick={props.onSafety}>
+          Stay Safe
+        </button>
+      </p>
+      <p className="mt-1 text-xs text-[var(--dim)]">
+        C.F.N.B. Cutthroat: Family Card Night — made by Albert Q. Lightfoot.
+        Questions? alquincy80@gmail.com
+      </p>
+    </footer>
+  );
+}
+
+function PolicySection({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <article className="rounded-3xl bg-[var(--surface)] p-4 shadow">
+      <h3 className="text-base font-black text-[var(--text)]">{title}</h3>
+      <div className="mt-1 space-y-2 text-sm text-[var(--dim)]">{children}</div>
+    </article>
+  );
+}
+
+function PrivacyScreen({ onBack }: { onBack: () => void }) {
+  return (
+    <section className="pt-4">
+      <BackBar title="Privacy Policy" onBack={onBack} />
+      <p className="mt-1 text-sm text-[var(--dim)]">
+        C.F.N.B. Cutthroat: Family Card Night is made by Albert Q. Lightfoot,
+        as an individual. This policy says what this version of the game
+        actually collects and does — nothing more.
+      </p>
+      <div className="mt-4 space-y-3">
+        <PolicySection title="What we collect">
+          <p>
+            <strong className="text-[var(--text)]">Your account:</strong>{" "}
+            the table name, email address, and birth year you type when you
+            sign up. Birth year is used only to work out whether you are
+            under 13, which switches on the extra safety rules below.
+          </p>
+          <p>
+            <strong className="text-[var(--text)]">Your password:</strong>{" "}
+            never stored as typed. It is salted and hashed (SHA-256) and only
+            the salt and hash are kept, so nobody at the game can read your
+            password back.
+          </p>
+          <p>
+            <strong className="text-[var(--text)]">Your game:</strong> story
+            chapters won, total wins, games played, and which one-time
+            purchases your account owns.
+          </p>
+          <p>
+            <strong className="text-[var(--text)]">Your purchases:</strong>{" "}
+            which product you bought and the Stripe payment record (session
+            id, product, amount). Card numbers are never typed into the game
+            and never stored by it — payment happens on Stripe&apos;s own
+            hosted checkout page, and Stripe&apos;s own privacy policy
+            applies there.
+          </p>
+          <p>
+            <strong className="text-[var(--text)]">Family Rooms:</strong>{" "}
+            the room code, the host&apos;s table name, the seats, and the
+            table size.
+          </p>
+          <p>
+            <strong className="text-[var(--text)]">Chat messages:</strong>{" "}
+            your table name, your account email, and the message text. Every
+            message is checked by a word filter before it posts, and messages
+            are stored so the table can read them.
+          </p>
+          <p>
+            <strong className="text-[var(--text)]">Reports:</strong> who
+            reported whom, and the reason picked.
+          </p>
+          <p>
+            <strong className="text-[var(--text)]">Voice chat:</strong> only
+            short-lived connection signals (who is in the room, call
+            offers/answers) that are deleted after about 2 minutes. Voice
+            audio itself goes directly between players&apos; devices — it
+            never passes through or is stored on the game&apos;s server.
+          </p>
+        </PolicySection>
+        <PolicySection title="What we do NOT do">
+          <p>
+            No third-party ads and no ad tracking — the only ads are the
+            game&apos;s own house ads for the Family Pass, shown between
+            games, never during a hand. No data is sold to anyone, and the
+            game does not collect your location, your contacts, or your
+            photos.
+          </p>
+        </PolicySection>
+        <PolicySection title="On your device">
+          <p>
+            Your phone or computer keeps your sign-in token, your guest
+            progress (if you play without an account), your chosen card back
+            and felt, and the list of players you blocked. Clearing the
+            game&apos;s saved data on your device signs you out.
+          </p>
+        </PolicySection>
+        <PolicySection title="Players under 13">
+          <p>
+            Under-13 accounts chat with quick-talk phrases only, cannot join
+            voice chat, and cannot buy anything in the Store. A parent or
+            guardian can ask for the account to be deleted — see below, or
+            email alquincy80@gmail.com.
+          </p>
+        </PolicySection>
+        <PolicySection title="Deleting your account">
+          <p>
+            You can delete your account in the game (My Account → Delete my
+            account). That permanently removes your account, your progress,
+            your purchases, your Stripe payment records, the chat messages
+            you wrote, and the reports you filed. Voice signals expire on
+            their own. Other players&apos; data is not touched.
+          </p>
+        </PolicySection>
+        <PolicySection title="Contact">
+          <p>
+            Questions about this policy, or about your data: email
+            alquincy80@gmail.com.
+          </p>
+        </PolicySection>
+      </div>
+    </section>
+  );
+}
+
+function TermsScreen({ onBack }: { onBack: () => void }) {
+  return (
+    <section className="pt-4">
+      <BackBar title="Terms of Service" onBack={onBack} />
+      <p className="mt-1 text-sm text-[var(--dim)]">
+        The short version: this is a family card game for points. Play nice,
+        and the table stays fun.
+      </p>
+      <div className="mt-4 space-y-3">
+        <PolicySection title="The game">
+          <p>
+            C.F.N.B. Cutthroat is a card game for points — bid from 3, first
+            to 150 wins. There is no real-money gambling, no betting, and no
+            cash prizes. Nothing you win in the game can be turned into real
+            money.
+          </p>
+        </PolicySection>
+        <PolicySection title="Free and paid">
+          <p>
+            Quick Play, Story chapters 1–2, Family Rooms, and the Family
+            Lounge are free. The Full Family Pass is $4.99 one-time and
+            Remove Ads is $1.99 one-time. Both are one-time payments — there
+            is no subscription. Purchases are tied to your signed-in account
+            and come back when you sign in on any device (Store → Restore
+            purchases).
+          </p>
+        </PolicySection>
+        <PolicySection title="Refunds">
+          <p>
+            Refunds follow the rules of whoever took the payment: Stripe for
+            card payments made on Stripe checkout, or Google Play / Apple for
+            purchases made through their stores. If something went wrong
+            with a purchase, email alquincy80@gmail.com and say what
+            happened.
+          </p>
+        </PolicySection>
+        <PolicySection title="Keep It Cool — how the table behaves">
+          <p>
+            Chat is moderated: a word filter checks every message before it
+            posts. Cussing, insults, bullying, and disrespect can earn
+            strikes, and 3 strikes puts an account on a 24-hour chat
+            cool-down automatically. Reports from other players add strikes
+            the same way. Players under 13 chat with quick-talk phrases
+            only and cannot join voice chat. In voice chat you can silence
+            another player, mute yourself, or turn voice off completely.
+            Anyone who keeps breaking the rules can lose access to chat and
+            voice.
+          </p>
+        </PolicySection>
+        <PolicySection title="Your account">
+          <p>
+            You need an account to save progress across devices and to buy
+            anything. Keep your password to yourself. You can delete your
+            account any time in the game (My Account → Delete my account) —
+            deletion is permanent and removes your progress, purchases, and
+            messages, as the Privacy Policy describes.
+          </p>
+        </PolicySection>
+        <PolicySection title="Changes">
+          <p>
+            If these terms change, the new version appears here in the game.
+            The game is made by Albert Q. Lightfoot as an individual.
+            Questions: alquincy80@gmail.com.
+          </p>
+        </PolicySection>
+      </div>
+    </section>
+  );
+}
+
+function SafetyScreen({ onBack }: { onBack: () => void }) {
+  return (
+    <section className="pt-4">
+      <BackBar title="Stay Safe" onBack={onBack} />
+      <p className="mt-1 text-sm text-[var(--dim)]">
+        This is a family table. If anyone makes it not feel like one,
+        you&apos;ve got tools — use them.
+      </p>
+      <div className="mt-4 space-y-3">
+        <PolicySection title="If someone is rude or mean">
+          <p>
+            <strong className="text-[var(--text)]">Report</strong> them from
+            their chat message — pick what happened. Reports add strikes, and
+            strikes put a player on a 24-hour cool-down.
+          </p>
+          <p>
+            <strong className="text-[var(--text)]">Block</strong> them from
+            their chat message — their messages stop showing for you, on this
+            device. Unblock them any time from the blocked list under the
+            chat.
+          </p>
+          <p>
+            <strong className="text-[var(--text)]">Silence</strong> them in
+            voice chat, mute yourself, or turn voice off completely.
+          </p>
+        </PolicySection>
+        <PolicySection title="Players under 13">
+          <p>
+            Under-13 players chat with quick-talk phrases only, can&apos;t
+            join voice chat, and can&apos;t buy anything. If you&apos;re a
+            parent or guardian and want an under-13 account changed or
+            deleted, email alquincy80@gmail.com.
+          </p>
+        </PolicySection>
+        <PolicySection title="Keep your account yours">
+          <p>
+            Never share your password, and never send money to another player
+            — the game has no way for players to pay each other, and anyone
+            asking is not part of the game. The only real payments are the
+            Family Pass ($4.99) and Remove Ads ($1.99) in the Store, paid on
+            Stripe&apos;s checkout page.
+          </p>
+        </PolicySection>
+        <PolicySection title="Need help?">
+          <p>Email alquincy80@gmail.com and say what happened.</p>
+        </PolicySection>
+      </div>
+    </section>
+  );
+}
+
 // ---------- Home ----------
 
 function HomeScreen(props: {
@@ -466,6 +765,9 @@ function HomeScreen(props: {
   onRules: () => void;
   onAccount: () => void;
   onLook: () => void;
+  onPrivacy: () => void;
+  onTerms: () => void;
+  onSafety: () => void;
 }) {
   const [playerCount, setPlayerCount] = useState<3 | 4>(4);
   const [difficulty, setDifficulty] = useState<Difficulty>("spicy");
@@ -685,6 +987,11 @@ function HomeScreen(props: {
       >
         How to Play — the house rules
       </button>
+      <SafetyLinks
+        onPrivacy={props.onPrivacy}
+        onTerms={props.onTerms}
+        onSafety={props.onSafety}
+      />
     </div>
   );
 }
@@ -1025,6 +1332,7 @@ function RoomsScreen(props: {
 
 function StoreScreen(props: {
   signedIn: boolean;
+  under13: boolean;
   hasPass: boolean;
   hasNoAds: boolean;
   token: string | null;
@@ -1032,11 +1340,15 @@ function StoreScreen(props: {
   onClearNotice: () => void;
   onBack: () => void;
   onAccount: () => void;
+  onPrivacy: () => void;
+  onTerms: () => void;
+  onSafety: () => void;
 }) {
   const queryClient = useQueryClient();
   const [buying, setBuying] = useState<"family_pass" | "remove_ads" | null>(null);
   const [card, setCard] = useState("4242 4242 4242 4242");
   const [msg, setMsg] = useState<string | null>(null);
+  const [restoreMsg, setRestoreMsg] = useState<string | null>(null);
 
   // Live or test mode comes from the server (STRIPE_SECRET_KEY set or not).
   const storeStatus = useQuery({
@@ -1083,9 +1395,35 @@ function StoreScreen(props: {
   function onBuyClick(product: "family_pass" | "remove_ads") {
     setMsg(null);
     props.onClearNotice();
+    if (props.under13) {
+      setMsg("Players under 13 can't buy things — ask a parent or guardian.");
+      return;
+    }
     if (live) checkout.mutate(product);
     else setBuying(product);
   }
+
+  // Restore purchases: purchases live on the signed-in account, so
+  // re-reading the profile brings back anything already owned.
+  const restore = useMutation({
+    mutationFn: () => api.getProfile({ token: props.token as string }),
+    onSuccess: (p) => {
+      if (!p.ok) {
+        setRestoreMsg("Couldn't check right now — sign in again and try.");
+        return;
+      }
+      const owned: string[] = [];
+      if (p.hasFamilyPass) owned.push("Full Family Pass (ads off too)");
+      else if (p.hasRemoveAds) owned.push("Remove Ads");
+      setRestoreMsg(
+        owned.length > 0
+          ? `Restored on this account: ${owned.join(", ")}.`
+          : "Nothing to restore on this account yet — no Family Pass or Remove Ads found.",
+      );
+      void queryClient.invalidateQueries({ queryKey: ["profile"] });
+    },
+    onError: () => setRestoreMsg("Couldn't check right now — try again in a second."),
+  });
 
   return (
     <section className="pt-4">
@@ -1124,6 +1462,34 @@ function StoreScreen(props: {
         </button>
       )}
 
+      {props.signedIn && props.under13 && (
+        <p className="mt-3 rounded-xl bg-[#fee2e2] px-3 py-2 text-sm font-bold text-[#7f1d1d]" role="alert">
+          Players under 13 can&apos;t buy things — ask a parent or guardian.
+        </p>
+      )}
+
+      {props.signedIn && (
+        <div className="mt-3 rounded-3xl bg-[var(--surface)] p-4 shadow">
+          <button
+            type="button"
+            disabled={restore.isPending}
+            onClick={() => restore.mutate()}
+            className="w-full rounded-full bg-[var(--bg)] py-3 text-base font-black text-[var(--text)] disabled:opacity-50"
+          >
+            {restore.isPending ? "Checking…" : "Restore purchases"}
+          </button>
+          <p className="mt-2 text-xs text-[var(--dim)]">
+            Purchases are tied to your signed-in account — sign in on any
+            device and tap Restore purchases to get them back.
+          </p>
+          {restoreMsg && (
+            <p className="mt-2 rounded-xl bg-[#dcfce7] px-3 py-2 text-sm font-bold text-[#14532d]" role="status">
+              {restoreMsg}
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="mt-4 space-y-3">
         <article className="rounded-3xl bg-[#221812] p-5 shadow-xl">
           <p className="text-xs font-black uppercase tracking-widest text-[#f5b942]">
@@ -1145,15 +1511,17 @@ function StoreScreen(props: {
           ) : (
             <button
               type="button"
-              disabled={!props.signedIn || checkout.isPending}
+              disabled={!props.signedIn || props.under13 || checkout.isPending}
               onClick={() => onBuyClick("family_pass")}
               className="mt-3 w-full rounded-full bg-[#f5b942] py-3 text-base font-black text-[#221812] disabled:opacity-40"
             >
-              {checkout.isPending
-                ? "Opening secure checkout…"
-                : live
-                  ? "Buy the Family Pass — pay on Stripe"
-                  : "Buy the Family Pass"}
+              {props.under13
+                ? "Under-13 players can't buy — ask a parent or guardian"
+                : checkout.isPending
+                  ? "Opening secure checkout…"
+                  : live
+                    ? "Buy the Family Pass — pay on Stripe"
+                    : "Buy the Family Pass"}
             </button>
           )}
         </article>
@@ -1173,21 +1541,23 @@ function StoreScreen(props: {
           ) : (
             <button
               type="button"
-              disabled={!props.signedIn || checkout.isPending}
+              disabled={!props.signedIn || props.under13 || checkout.isPending}
               onClick={() => onBuyClick("remove_ads")}
               className="mt-3 w-full rounded-full bg-[#14532d] py-3 text-base font-black text-white disabled:opacity-40"
             >
-              {checkout.isPending
-                ? "Opening secure checkout…"
-                : live
-                  ? "Remove ads — pay on Stripe ($1.99)"
-                  : "Remove ads — $1.99"}
+              {props.under13
+                ? "Under-13 players can't buy — ask a parent or guardian"
+                : checkout.isPending
+                  ? "Opening secure checkout…"
+                  : live
+                    ? "Remove ads — pay on Stripe ($1.99)"
+                    : "Remove ads — $1.99"}
             </button>
           )}
         </article>
       </div>
 
-      {buying && !live && (
+      {buying && !live && !props.under13 && (
         <form
           className="mt-4 rounded-3xl bg-[var(--surface)] p-4 shadow"
           onSubmit={(e) => {
@@ -1254,16 +1624,26 @@ function StoreScreen(props: {
       )}
       <p className="mt-4 text-xs text-[var(--dim)]">
         Ads only ever appear between games — never during a hand — and at
-        launch they're house ads for the Family Pass. A real ad network can be
+        launch they&apos;re house ads for the Family Pass. A real ad network can be
         connected after the game is published and approved.
       </p>
+      <SafetyLinks
+        onPrivacy={props.onPrivacy}
+        onTerms={props.onTerms}
+        onSafety={props.onSafety}
+      />
     </section>
   );
 }
 
 // ---------- Rules ----------
 
-function RulesScreen({ onBack }: { onBack: () => void }) {
+function RulesScreen(props: {
+  onBack: () => void;
+  onPrivacy: () => void;
+  onTerms: () => void;
+  onSafety: () => void;
+}) {
   const rules: [string, string][] = [
     ["Every player for themselves", "No teams, no partners. 4-player classic, or 3-player with the 2 of clubs taken out so everybody gets 17 cards."],
     ["Bid from 3", "Bidding starts at 3 books. There's no nil and no passing — everybody bids, every hand."],
@@ -1277,7 +1657,7 @@ function RulesScreen({ onBack }: { onBack: () => void }) {
   ];
   return (
     <section className="pt-4">
-      <BackBar title="How to Play" onBack={onBack} />
+      <BackBar title="How to Play" onBack={props.onBack} />
       <p className="mt-1 text-sm font-semibold text-[var(--dim)]">
         C.F.N.B. stands for “You can choose your family, but not your blood.”
         These are the house rules, exactly how the family plays them:
@@ -1295,16 +1675,21 @@ function RulesScreen({ onBack }: { onBack: () => void }) {
       <article className="mt-3 rounded-3xl bg-[#14532d] p-4 shadow">
         <h3 className="text-base font-black text-white">Table manners</h3>
         <p className="mt-1 text-sm font-semibold text-white/90">
-          Chat is “Keep It Cool” moderated: a word filter and a tone check read
-          every message before it posts, reports add strikes, and repeat
-          offenders get an automatic 24-hour cool-down. Players under 13 chat
-          with quick-talk phrases only. Voice chat at Family Room tables runs
-          on the same standing: players on a cool-down can't join voice,
+          Chat is “Keep It Cool” moderated: a word filter checks every
+          message before it posts, reports add strikes, and repeat offenders
+          get an automatic 24-hour cool-down. Players under 13 chat with
+          quick-talk phrases only. Voice chat at Family Room tables runs on
+          the same standing: players on a cool-down can&apos;t join voice,
           under-13 players stay on quick-talk, voice reports add the same
-          strikes, and anyone can mute themselves, silence another player, or
-          turn voice off completely.
+          strikes, and anyone can mute themselves, silence another player,
+          block them in chat, or turn voice off completely.
         </p>
       </article>
+      <SafetyLinks
+        onPrivacy={props.onPrivacy}
+        onTerms={props.onTerms}
+        onSafety={props.onSafety}
+      />
     </section>
   );
 }
@@ -1319,6 +1704,10 @@ function AccountScreen(props: {
   onBack: () => void;
   onSignedIn: (token: string) => void;
   onSignOut: () => void;
+  onAccountDeleted: () => void;
+  onPrivacy: () => void;
+  onTerms: () => void;
+  onSafety: () => void;
 }) {
   const [mode, setMode] = useState<"in" | "up">("in");
   const [name, setName] = useState("");
@@ -1400,6 +1789,15 @@ function AccountScreen(props: {
             Sign out
           </button>
         </div>
+        <DeleteAccountSection
+          token={props.token}
+          onDeleted={props.onAccountDeleted}
+        />
+        <SafetyLinks
+          onPrivacy={props.onPrivacy}
+          onTerms={props.onTerms}
+          onSafety={props.onSafety}
+        />
       </section>
     );
   }
@@ -1536,6 +1934,122 @@ function AccountScreen(props: {
         </p>
       </div>
     </section>
+  );
+}
+
+// Delete my account: double-confirm (type DELETE + account password).
+// The server deletes the account and the player's own data, then the
+// client clears the local session and goes home signed out.
+function DeleteAccountSection(props: {
+  token: string | null;
+  onDeleted: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const remove = useMutation({
+    mutationFn: () =>
+      api.deleteAccount({
+        token: props.token as string,
+        password,
+        confirm: true as const,
+      }),
+    onSuccess: (res) => {
+      if (res.ok) {
+        props.onDeleted();
+      } else {
+        setError(res.error ?? "Couldn't delete the account. Try again.");
+      }
+    },
+    onError: () => setError("Couldn't delete the account — try again in a second."),
+  });
+
+  return (
+    <div className="mt-3 rounded-3xl border border-[#b91c1c]/40 bg-[var(--surface)] p-4 shadow">
+      <h3 className="text-base font-black text-[#b91c1c]">Delete my account</h3>
+      {!open ? (
+        <>
+          <p className="mt-1 text-sm text-[var(--dim)]">
+            Permanently removes your account, progress, purchases, and the
+            chat messages you wrote. Other players&apos; data is not touched.
+            This can&apos;t be undone.
+          </p>
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="mt-3 w-full rounded-full bg-[#fee2e2] py-2.5 text-sm font-black text-[#7f1d1d]"
+          >
+            Delete my account…
+          </button>
+        </>
+      ) : (
+        <form
+          className="mt-2 space-y-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setError(null);
+            remove.mutate();
+          }}
+        >
+          <p className="rounded-xl bg-[#fee2e2] px-3 py-2 text-sm font-bold text-[#7f1d1d]">
+            This is permanent. Your account, progress, purchases, and your
+            chat messages will be gone for good.
+          </p>
+          <div>
+            <label className="block text-sm font-bold text-[var(--text)]" htmlFor="delete-type">
+              Type DELETE to confirm
+            </label>
+            <input
+              id="delete-type"
+              className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2.5 text-base font-black tracking-widest text-[var(--text)]"
+              value={typed}
+              maxLength={6}
+              onChange={(e) => setTyped(e.target.value.toUpperCase())}
+              placeholder="DELETE"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-[var(--text)]" htmlFor="delete-pass">
+              Your account password
+            </label>
+            <input
+              id="delete-pass"
+              type="password"
+              required
+              className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2.5 text-base text-[var(--text)]"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+          {error && (
+            <p className="rounded-lg bg-[#fee2e2] px-3 py-2 text-sm font-semibold text-[#7f1d1d]" role="alert">
+              {error}
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={typed !== "DELETE" || !password || remove.isPending}
+            className="w-full rounded-full bg-[#b91c1c] py-3 text-base font-black text-white disabled:opacity-40"
+          >
+            {remove.isPending ? "Deleting…" : "Yes, delete my account forever"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              setTyped("");
+              setPassword("");
+              setError(null);
+            }}
+            className="w-full rounded-full bg-[var(--bg)] py-2.5 text-sm font-black text-[var(--text)]"
+          >
+            Keep my account
+          </button>
+        </form>
+      )}
+    </div>
   );
 }
 

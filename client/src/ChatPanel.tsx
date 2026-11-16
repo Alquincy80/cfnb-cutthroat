@@ -18,6 +18,26 @@ const REPORT_REASONS = [
   "Something else not family-friendly",
 ];
 
+// Players blocked on this device only. Keyed by author (table) name, kept
+// in localStorage — blocking hides that player's messages for you here; it
+// does not remove them for anyone else or report them.
+const LS_BLOCKED = "cfnb-blocked";
+
+function loadBlocked(): string[] {
+  try {
+    const raw = localStorage.getItem(LS_BLOCKED);
+    if (raw) {
+      const parsed: unknown = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((n): n is string => typeof n === "string");
+      }
+    }
+  } catch {
+    /* no blocked list yet */
+  }
+  return [];
+}
+
 export function ChatPanel({
   scope,
   roomCode,
@@ -31,6 +51,24 @@ export function ChatPanel({
   const [reportTarget, setReportTarget] = useState<string | null>(null);
   const [reportReason, setReportReason] = useState(REPORT_REASONS[0] as string);
   const [reportDone, setReportDone] = useState(false);
+  const [blocked, setBlocked] = useState<string[]>(loadBlocked);
+
+  function saveBlocked(next: string[]) {
+    setBlocked(next);
+    try {
+      localStorage.setItem(LS_BLOCKED, JSON.stringify(next));
+    } catch {
+      /* blocking still works for this session */
+    }
+  }
+
+  function blockAuthor(name: string) {
+    if (!blocked.includes(name)) saveBlocked([...blocked, name]);
+  }
+
+  function unblockAuthor(name: string) {
+    saveBlocked(blocked.filter((n) => n !== name));
+  }
 
   const messages = useQuery({
     queryKey: ["messages", scope, roomCode],
@@ -77,6 +115,8 @@ export function ChatPanel({
   });
 
   const list = messages.data?.messages ?? [];
+  const visible = list.filter((m) => !blocked.includes(m.authorName));
+  const hiddenCount = list.length - visible.length;
 
   return (
     <div className="flex h-full flex-col">
@@ -90,29 +130,69 @@ export function ChatPanel({
             right away.
           </p>
         )}
-        {list.map((m) => (
+        {hiddenCount > 0 && (
+          <p className="rounded-lg bg-[var(--bg)] px-3 py-2 text-xs font-semibold text-[var(--dim)]">
+            {hiddenCount} message{hiddenCount === 1 ? "" : "s"} hidden from{" "}
+            {blocked.length === 1 ? "a player you blocked" : "players you blocked"}.
+          </p>
+        )}
+        {visible.map((m) => (
           <div key={m.id} className="rounded-xl bg-[var(--bg)] px-3 py-2">
             <div className="flex items-baseline justify-between gap-2">
               <span className="text-sm font-bold text-[var(--text)]">
                 {m.authorName}
               </span>
               {m.authorName !== displayName && (
-                <button
-                  type="button"
-                  className="shrink-0 text-xs font-semibold text-[#b91c1c] underline"
-                  aria-label={`Report ${m.authorName}`}
-                  onClick={() => {
-                    setReportTarget(m.authorName);
-                    setReportDone(false);
-                  }}
-                >
-                  Report
-                </button>
+                <span className="flex shrink-0 gap-3">
+                  <button
+                    type="button"
+                    className="text-xs font-semibold text-[var(--dim)] underline"
+                    aria-label={`Block ${m.authorName}`}
+                    onClick={() => blockAuthor(m.authorName)}
+                  >
+                    Block
+                  </button>
+                  <button
+                    type="button"
+                    className="text-xs font-semibold text-[#b91c1c] underline"
+                    aria-label={`Report ${m.authorName}`}
+                    onClick={() => {
+                      setReportTarget(m.authorName);
+                      setReportDone(false);
+                    }}
+                  >
+                    Report
+                  </button>
+                </span>
               )}
             </div>
             <p className="text-sm text-[var(--text)]">{m.body}</p>
           </div>
         ))}
+        {blocked.length > 0 && (
+          <div className="rounded-xl bg-[var(--bg)] px-3 py-2">
+            <p className="text-xs font-bold text-[var(--dim)]">
+              Blocked on this device ({blocked.length}):{" "}
+              {blocked.join(", ")}
+            </p>
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {blocked.map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  className="rounded-full bg-[var(--surface)] px-3 py-1 text-xs font-bold text-[var(--text)] shadow"
+                  onClick={() => unblockAuthor(name)}
+                >
+                  Unblock {name}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-xs text-[var(--dim)]">
+              Blocking only hides their messages for you, on this device.
+              Report them if they broke the Keep It Cool rules.
+            </p>
+          </div>
+        )}
       </div>
 
       {reportTarget && (
@@ -218,8 +298,9 @@ export function ChatPanel({
         </form>
       )}
       <p className="mt-2 text-xs text-[var(--dim)]">
-        Every message is checked before it posts — a word filter and a tone
-        check keep cussing, insults, and disrespect off the table.
+        Every message is checked before it posts — a word filter keeps
+        cussing, insults, and disrespect off the table. Report or block any
+        player who still gets through.
       </p>
     </div>
   );
