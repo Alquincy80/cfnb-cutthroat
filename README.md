@@ -92,6 +92,89 @@ Neon free scales to zero after 5 min idle (short wake). Render itself says
 don't use free instances for production — when the game starts earning,
 the first paid step is ~$7/mo for an always-on Render service.
 
+## Safety & Store Readiness
+
+Safeguards built for app-store submission (Google Play / Apple App Store).
+Nothing has been submitted and no store account exists yet.
+
+### Done — in the code
+
+- **Privacy Policy + Terms of Service in-app** — `client/src/App.tsx`
+  (`PrivacyScreen`, `TermsScreen`, views `privacy` / `terms`, linked from
+  the home footer and the Store and Rules screens). Written only to what
+  the code actually does: exactly the data stored (account name/email/
+  birth year, salted-hashed password, progress, purchases, Stripe payment
+  records, room codes/seats, chat messages, reports, short-lived voice
+  signals), voice audio peer-to-peer and never stored, no third-party ads
+  and no ad tracking, no data sold, purchases via Stripe hosted checkout
+  (Stripe's own privacy policy applies there), contact
+  alquincy80@gmail.com, game by Albert Q. Lightfoot as an individual —
+  no LLC claim, no business address or phone invented. Terms: card game
+  for points, no real-money gambling, no cash prizes, Family Pass $4.99
+  one-time / Remove Ads $1.99 one-time, refunds via Stripe/Google Play/
+  Apple per their rules, Keep It Cool conduct rules, under-13 rules,
+  in-app account deletion.
+- **Account deletion** — server `deleteAccount` in
+  `server/src/actions.ts` (password + type-DELETE confirmation, both
+  required), UI in `client/src/App.tsx` (`DeleteAccountSection` on the
+  My Account screen). Deletes the account row plus that player's
+  progress, purchases, Stripe payment records, chat messages they
+  authored, and reports they filed — in one transaction where the
+  database driver supports it (PGlite does; the Neon HTTP driver does
+  not, so it falls back to the same deletes in sequence). Other
+  players' data is untouched; voice-signal rows are short-lived and
+  left to expire. Deleting signs the player out and returns to home.
+- **Under-13 purchase gate** — `server/src/actions.ts`: `buyProduct`
+  and `createCheckoutSession` both refuse under-13 accounts with
+  "Players under 13 can't buy things — ask a parent or guardian."
+  (test-mode 4242 flow included). The Store UI (`StoreScreen`) hides
+  the buy path for under-13 profiles and shows the same message.
+- **Restore purchases** — "Restore purchases" button in the Store
+  (`StoreScreen`) re-reads the profile (`getProfile`) and reports what
+  the signed-in account owns (Family Pass / Remove Ads / nothing yet).
+  Purchases are tied to the account, so they come back on any device
+  after sign-in. No new server action.
+- **Block a player** — `client/src/ChatPanel.tsx`: a Block button sits
+  next to Report on each message. Blocked authors' messages are hidden
+  for that player only (localStorage list `cfnb-blocked`, keyed by
+  author name), with an Unblock button per name and a count of hidden
+  messages shown. Voice silence already existed and is unchanged.
+- **Safety links** — footer on the home screen and in the Store and
+  Rules screens (`SafetyLinks` in `client/src/App.tsx`) linking to
+  Privacy, Terms, and a "Stay Safe" screen (`SafetyScreen`: report /
+  block / silence, under-13 quick-talk, contact alquincy80@gmail.com).
+  No new external links were added; the only external destination is
+  the Stripe checkout redirect that already existed.
+- **Already there (audited, not new):** birth-year sign-up with
+  under-13 = current year − birth year < 13; under-13 quick-talk-only
+  chat and no voice join; word filter + 3 strikes → 24-hour cool-down;
+  report action; per-player voice silence; house ads only between
+  games; Stripe hosted Checkout; salted SHA-256 passwords.
+- **Word-filter fix found while testing:** the filter matched banned
+  words as substrings, so "hello" (contains "hell") and "classic"
+  (contains "ass") could not post at all. It now matches whole words /
+  phrases only (`server/src/actions.ts`, `wordFilterHit`). Real banned
+  words are still blocked.
+
+### NOT done — needs Al or a store account
+
+- **Google Play developer account — $25 one-time.** Apple Developer
+  Program — **$99/year**. No account has been created and nothing has
+  been paid. Al signs up for these himself when ready.
+- **Content-rating questionnaire** (ESRB / IARC in Play Console,
+  Apple age rating) — not filled in.
+- **Play Data Safety form / Apple privacy nutrition labels** — not
+  filled in. The Privacy Policy above is the factual source to copy
+  from when filling them in.
+- **Real ad network decision** — currently house ads only. Connecting
+  a real network (and its tracking disclosures) is a separate decision.
+- **Parental-consent flow for under-13 accounts** — under-13 accounts
+  are restricted (quick-talk only, no voice, no purchases) but there is
+  no parent-approval step at sign-up yet.
+- **Human review of reports** — reports currently feed automated
+  strikes only; nobody reviews them by hand.
+- **App-store screenshots and descriptions** — not made.
+
 ## Verify before sharing the link
 
 - Open the site, sign up, sign in.
