@@ -106,6 +106,60 @@ export function App() {
     localStorage.setItem(LS_LOOK, JSON.stringify(look));
   }, [look]);
 
+  // Stripe Checkout return: Stripe redirects back here with
+  // ?checkout=success&session_id=...&product=... (or checkout=cancelled).
+  // The session is verified server-side before anything unlocks.
+  const [storeNotice, setStoreNotice] = useState<string | null>(null);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const checkout = params.get("checkout");
+    if (!checkout) return;
+    // Clear the return params from the URL right away so a refresh
+    // doesn't re-run the confirmation.
+    window.history.replaceState({}, "", window.location.pathname);
+    if (checkout === "cancelled") {
+      setStoreNotice("Payment cancelled — nothing was charged.");
+      setView("store");
+      return;
+    }
+    if (checkout !== "success") return;
+    const sessionId = params.get("session_id");
+    const product = params.get("product");
+    if (!sessionId || (product !== "family_pass" && product !== "remove_ads")) {
+      setStoreNotice("That checkout return was missing its details.");
+      setView("store");
+      return;
+    }
+    const savedToken = localStorage.getItem(LS_TOKEN);
+    if (!savedToken) {
+      setStoreNotice("Sign in to finish your purchase — Stripe got the payment, your account just needs to claim it.");
+      setView("store");
+      return;
+    }
+    setView("store");
+    void api
+      .confirmCheckout({ token: savedToken, sessionId })
+      .then((res) => {
+        if (res.ok) {
+          setStoreNotice(
+            res.product === "family_pass"
+              ? "Payment confirmed — the Full Family Pass is on your account. Enjoy the full table."
+              : "Payment confirmed — ads are off for good.",
+          );
+          void queryClient.invalidateQueries({ queryKey: ["profile"] });
+        } else {
+          setStoreNotice(
+            res.error ?? "Stripe couldn't confirm that payment yet.",
+          );
+        }
+      })
+      .catch(() => {
+        setStoreNotice("Stripe couldn't confirm that payment yet — try opening the Store again in a moment.");
+      });
+    // Run once on load; the token is read straight from storage.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const profile = useQuery({
     queryKey: ["profile", token],
     queryFn: () => api.getProfile({ token: token as string }),
@@ -281,6 +335,8 @@ export function App() {
             hasPass={hasPass}
             hasNoAds={hasNoAds}
             token={token}
+            notice={storeNotice}
+            onClearNotice={() => setStoreNotice(null)}
             onBack={() => setView("home")}
             onAccount={() => setView("account")}
           />
@@ -972,6 +1028,8 @@ function StoreScreen(props: {
   hasPass: boolean;
   hasNoAds: boolean;
   token: string | null;
+  notice: string | null;
+  onClearNotice: () => void;
   onBack: () => void;
   onAccount: () => void;
 }) {
@@ -980,6 +1038,14 @@ function StoreScreen(props: {
   const [card, setCard] = useState("4242 4242 4242 4242");
   const [msg, setMsg] = useState<string | null>(null);
 
+  // Live or test mode comes from the server (STRIPE_SECRET_KEY set or not).
+  const storeStatus = useQuery({
+    queryKey: ["storeStatus"],
+    queryFn: () => api.getStoreStatus({}),
+  });
+  const live = storeStatus.data?.live ?? false;
+
+  // Test-mode buy (unchanged): 4242 only, no real charge.
   const buy = useMutation({
     mutationFn: (product: "family_pass" | "remove_ads") =>
       api.buyProduct({ token: props.token as string, product, cardNumber: card }),
@@ -995,6 +1061,32 @@ function StoreScreen(props: {
     onError: () => setMsg("Checkout hiccup — try again in a second."),
   });
 
+  // Live buy: Stripe Checkout Session, then the player pays on Stripe's
+  // own page — no card details are typed in the game.
+  const checkout = useMutation({
+    mutationFn: (product: "family_pass" | "remove_ads") =>
+      api.createCheckoutSession({
+        token: props.token as string,
+        product,
+        origin: window.location.origin,
+      }),
+    onSuccess: (res) => {
+      if (res.ok && res.checkoutUrl) {
+        window.location.href = res.checkoutUrl;
+      } else {
+        setMsg(res.error ?? "Stripe couldn't start checkout just now.");
+      }
+    },
+    onError: () => setMsg("Checkout hiccup — try again in a second."),
+  });
+
+  function onBuyClick(product: "family_pass" | "remove_ads") {
+    setMsg(null);
+    props.onClearNotice();
+    if (live) checkout.mutate(product);
+    else setBuying(product);
+  }
+
   return (
     <section className="pt-4">
       <BackBar title="Store" onBack={props.onBack} />
@@ -1003,12 +1095,24 @@ function StoreScreen(props: {
         and the Lounge cost nothing. These one-time buys open the rest — no
         subscription, ever.
       </p>
-      <p className="mt-2 rounded-xl bg-[#fff7e0] px-3 py-2 text-xs font-bold text-[#7c2d12]">
-        Stripe TEST MODE: checkout runs on Stripe's test rails. Use test card
-        4242 4242 4242 4242, any future date, any 3-digit code — no real money
-        moves. Live payments start when the owner claims the Stripe account at
-        publish time.
-      </p>
+      {live ? (
+        <p className="mt-2 rounded-xl bg-[#dcfce7] px-3 py-2 text-xs font-bold text-[#14532d]">
+          Live payments: you'll pay securely on Stripe's own checkout page.
+          No card details are typed in this game — real money moves, $4.99
+          for the Family Pass, $1.99 to remove ads.
+        </p>
+      ) : (
+        <p className="mt-2 rounded-xl bg-[#fff7e0] px-3 py-2 text-xs font-bold text-[#7c2d12]">
+          Stripe TEST MODE: checkout runs on Stripe's test rails. Use test card
+          4242 4242 4242 4242, any future date, any 3-digit code — no real money
+          moves. Live payments start when the owner adds the live Stripe key.
+        </p>
+      )}
+      {props.notice && (
+        <p className="mt-2 rounded-xl bg-[#dcfce7] px-3 py-2 text-sm font-bold text-[#14532d]" role="status">
+          {props.notice}
+        </p>
+      )}
 
       {!props.signedIn && (
         <button
@@ -1041,11 +1145,15 @@ function StoreScreen(props: {
           ) : (
             <button
               type="button"
-              disabled={!props.signedIn}
-              onClick={() => setBuying("family_pass")}
+              disabled={!props.signedIn || checkout.isPending}
+              onClick={() => onBuyClick("family_pass")}
               className="mt-3 w-full rounded-full bg-[#f5b942] py-3 text-base font-black text-[#221812] disabled:opacity-40"
             >
-              Buy the Family Pass
+              {checkout.isPending
+                ? "Opening secure checkout…"
+                : live
+                  ? "Buy the Family Pass — pay on Stripe"
+                  : "Buy the Family Pass"}
             </button>
           )}
         </article>
@@ -1065,17 +1173,21 @@ function StoreScreen(props: {
           ) : (
             <button
               type="button"
-              disabled={!props.signedIn}
-              onClick={() => setBuying("remove_ads")}
+              disabled={!props.signedIn || checkout.isPending}
+              onClick={() => onBuyClick("remove_ads")}
               className="mt-3 w-full rounded-full bg-[#14532d] py-3 text-base font-black text-white disabled:opacity-40"
             >
-              Remove ads — $1.99
+              {checkout.isPending
+                ? "Opening secure checkout…"
+                : live
+                  ? "Remove ads — pay on Stripe ($1.99)"
+                  : "Remove ads — $1.99"}
             </button>
           )}
         </article>
       </div>
 
-      {buying && (
+      {buying && !live && (
         <form
           className="mt-4 rounded-3xl bg-[var(--surface)] p-4 shadow"
           onSubmit={(e) => {
