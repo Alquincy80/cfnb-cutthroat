@@ -2,6 +2,10 @@
 # $0 Hobby plan, no card. Sleeps after 15 min idle, ~1 min to wake.
 # DATABASE_URL is set in the Render dashboard from the Neon project,
 # NOT in this file.
+# NOTE: the dashboard build command is "bun install && bun run build"
+# (Render already provides Bun) — if this service is ever recreated from
+# this file, update buildCommand to match; the old command in this file
+# installs Bun again and fails the first deploy.
 services:
   - type: web
     name: cfnb-cutthroat
@@ -13,4 +17,10 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
+        sync: false
+      # Live Stripe payments. Leave unset for test mode. When Al is ready
+      # to take real money, he adds the LIVE secret key (sk_live_...) from
+      # his existing LightWorks Stripe account in the Render dashboard
+      # (Environment), never in this file or in git.
+      - key: STRIPE_SECRET_KEY
         sync: false

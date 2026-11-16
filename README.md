@@ -20,11 +20,43 @@ The live Muse artifact is untouched; this is a separate copy.
   away under-13 and cooled-down accounts.
 - **Game, store, and prices are unchanged.** Quick Play, Story 1–2, and
   Family Rooms are free; Full Family Pass is $4.99 one-time and Remove Ads
-  $1.99 in **Stripe test mode** (test card 4242 only, no real charge).
-  "Free" here means **free hosting for Al** — the game is still monetized
-  exactly as planned. Switching the store to live Stripe happens only after
-  Al opens a Stripe account in his name and adds live keys.
+  $1.99. **Stripe Checkout is live-capable:** when `STRIPE_SECRET_KEY`
+  is set on the server, the Store creates a real Stripe Checkout Session
+  (hosted by Stripe, no card details typed in the game) and the server
+  verifies the paid session with Stripe before unlocking anything. With
+  no key set, the Store keeps the old test flow (test card 4242 only, no
+  real charge). "Free" here means **free hosting for Al** — the game is
+  still monetized exactly as planned. Switching the store to live Stripe
+  happens only after Al adds the live key from his existing LightWorks
+  Stripe account — see "Going live with Stripe" below.
 - Google sign-in stays off (no OAuth app yet).
+
+## Going live with Stripe (real money)
+
+Al already has a Stripe account for LightWorks — do NOT create a new one.
+The game uses that account's **live secret key** (`sk_live_...`):
+
+1. Al signs in to his Stripe Dashboard himself and copies the live secret
+   key (Dashboard > Developers > API keys). He never sends the key in chat
+   and it never goes in the repo.
+2. In the Render dashboard, service `cfnb-cutthroat` > Environment, add
+   `STRIPE_SECRET_KEY` with that value, then redeploy (Render restarts the
+   service on env changes). No publishable key is needed — the browser
+   never talks to Stripe; checkout is hosted by Stripe.
+3. Verify live: sign in to the game, open the Store — it now says "Live
+   payments" — buy the Family Pass with a real card and confirm it unlocks
+   and the payment shows in Stripe. Test card 4242 no longer unlocks
+   anything once live is on.
+
+How it works: `POST /actions` `createCheckoutSession` creates a Stripe
+Checkout Session (price_data, $4.99 / $1.99 USD, metadata `accountId` +
+`product`) and returns Stripe's hosted URL; the player pays there and
+Stripe redirects back to `/?checkout=success&session_id=...`. The app
+then calls `confirmCheckout`, which retrieves the session from Stripe and
+only unlocks when the session is paid, the product and amount match, and
+the session belongs to that player's account. Each paid session is
+recorded once (`stripe_payments`, unique session id), so a return/refresh
+can't double-unlock.
 
 ## Run locally (no accounts needed)
 
