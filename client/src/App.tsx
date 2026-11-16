@@ -471,6 +471,9 @@ function HomeScreen(props: {
             Family Card Night — bid from 3, beat the card on the table,
             first to 150.
           </p>
+          <p className="mt-2 text-center text-sm font-black uppercase tracking-[0.14em] text-[#ffe9b0]">
+            Created by Albert Q. Lightfoot
+          </p>
 
           {/* The family, front and center */}
           <div
