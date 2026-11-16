@@ -682,7 +682,7 @@ export function GameTable({
   return (
     <div className="mx-auto w-full max-w-[540px] px-1.5 pb-3">
       {/* Top bar */}
-      <div className="flex items-center justify-between gap-2 py-0.5">
+      <div className="flex flex-wrap items-center justify-between gap-2 py-0.5">
         <button
           type="button"
           onClick={onExit}
@@ -708,12 +708,12 @@ export function GameTable({
               if (next) startMusic();
               else stopMusic();
             }}
-            className={`rounded-full px-2.5 py-1 text-[13px] font-black text-white shadow ${musicOn ? "bg-[#14532d]" : "bg-black/55"}`}
+            className={`rounded-full px-2 py-1 text-[13px] font-black text-white shadow sm:px-2.5 ${musicOn ? "bg-[#14532d]" : "bg-black/55"}`}
             aria-pressed={musicOn}
             aria-label={musicOn ? "Turn background music off" : "Turn background music on"}
             title="Background music"
           >
-            🎵 Music
+            🎵<span className="hidden sm:inline"> Music</span>
           </button>
           <button
             type="button"
@@ -723,12 +723,12 @@ export function GameTable({
               setSfxEnabled(next);
               if (next) sfxBid();
             }}
-            className={`rounded-full px-2.5 py-1 text-[13px] font-black text-white shadow ${sfxOn ? "bg-[#14532d]" : "bg-black/55"}`}
+            className={`rounded-full px-2 py-1 text-[13px] font-black text-white shadow sm:px-2.5 ${sfxOn ? "bg-[#14532d]" : "bg-black/55"}`}
             aria-pressed={sfxOn}
             aria-label={sfxOn ? "Turn sound effects off" : "Turn sound effects on"}
             title="Sound effects"
           >
-            🔊 SFX
+            🔊<span className="hidden sm:inline"> SFX</span>
           </button>
           {config.mode === "room" && config.roomCode && (
             <>
