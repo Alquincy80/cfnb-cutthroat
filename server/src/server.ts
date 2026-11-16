@@ -1,6 +1,6 @@
 // Standalone Bun server for C.F.N.B. Cutthroat: Family Card Night.
 // Serves the built React client from client/dist and implements
-// POST /actions for the 14 game actions (same {action, args} shape the
+// POST /actions for the 15 game actions (same {action, args} shape the
 // original Muse space used, returning {data} on success).
 // Run: bun ./server/src/server.ts   (PORT env, default 3000)
 // Build client first: bun run build

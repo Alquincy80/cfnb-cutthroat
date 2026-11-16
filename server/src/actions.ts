@@ -10,7 +10,7 @@
 // the strike / 24-hour cool-down rules are unchanged. Quick-talk phrases
 // always pass; under-13 accounts still get quick-talk only.
 
-import { defineAction, z, type ActionsModule, type Ctx } from "./sdk";
+import { defineAction, z, type ActionsModule, type Ctx, type Db } from "./sdk";
 import { and, desc, eq, gt, lt } from "drizzle-orm";
 import * as schema from "./schema";
 import {
@@ -23,6 +23,13 @@ import {
 } from "./stripe";
 
 const CURRENT_YEAR = 2026;
+
+const UNDER13_NO_BUY =
+  "Players under 13 can't buy things — ask a parent or guardian.";
+
+function isUnder13(birthYear: number): boolean {
+  return CURRENT_YEAR - birthYear < 13;
+}
 
 function randomHex(bytes: number): string {
   const buf = new Uint8Array(bytes);
@@ -52,7 +59,10 @@ const BANNED_WORDS = [
 function wordFilterHit(body: string): string | null {
   const lower = ` ${body.toLowerCase().replace(/[^a-z ]/g, " ")} `;
   for (const w of BANNED_WORDS) {
-    if (lower.includes(` ${w} `) || lower.includes(w)) return w;
+    // Whole-word / whole-phrase match only: the old bare substring check
+    // also flagged innocent words ("hello" contains "hell", "classic"
+    // contains "ass"), so plain greetings could not post at all.
+    if (lower.includes(` ${w} `)) return w;
   }
   return null;
 }
@@ -153,6 +163,36 @@ async function accountByToken(ctx: Ctx, token: string) {
     .where(eq(schema.accounts.token, token))
     .limit(1);
   return rows[0] ?? null;
+}
+
+// Deletes one player's own rows only: their account, progress, purchases,
+// Stripe payment records, chat messages they authored (matched by their
+// account email), and reports they filed (matched by their table name).
+// Other players' accounts, messages, reports, and rooms are untouched.
+// Voice-signal rows are short-lived (pruned after 2 minutes) and are left
+// to expire on their own.
+async function deleteAccountRows(
+  exec: Pick<Db, "delete">,
+  accountId: number,
+  email: string,
+  name: string,
+): Promise<void> {
+  await exec
+    .delete(schema.progress)
+    .where(eq(schema.progress.accountId, accountId));
+  await exec
+    .delete(schema.purchases)
+    .where(eq(schema.purchases.accountId, accountId));
+  await exec
+    .delete(schema.stripePayments)
+    .where(eq(schema.stripePayments.accountId, accountId));
+  await exec
+    .delete(schema.messages)
+    .where(eq(schema.messages.authorEmail, email));
+  await exec
+    .delete(schema.reports)
+    .where(eq(schema.reports.reporterName, name));
+  await exec.delete(schema.accounts).where(eq(schema.accounts.id, accountId));
 }
 
 export const Actions = {
@@ -262,6 +302,48 @@ export const Actions = {
     },
   }),
 
+  deleteAccount: defineAction({
+    description:
+      "Permanently deletes the signed-in player's account and their own data: progress, purchases, Stripe payment records, chat messages they authored, and reports they filed. Other players' data is untouched. Requires the account password and an explicit confirmation.",
+    request: z.object({
+      token: z.string().min(1),
+      password: z.string().min(1).max(100),
+      confirm: z.literal(true),
+    }),
+    response: z.object({ ok: z.boolean(), error: z.string().nullable() }),
+    async handler(ctx, args) {
+      const db = ctx.db();
+      const acct = await accountByToken(ctx, args.token);
+      if (!acct) {
+        return {
+          ok: false,
+          error: "Please sign in again — that session isn't valid.",
+        };
+      }
+      if (
+        acct.passHash !== (await hashPassword(acct.passSalt, args.password))
+      ) {
+        return {
+          ok: false,
+          error: "That password doesn't match this account.",
+        };
+      }
+      // One transaction when the driver supports it (PGlite does); the
+      // Neon HTTP driver has no transaction support, so fall back to
+      // sequential deletes of the same rows — each delete is idempotent,
+      // so a re-run deletes nothing twice.
+      try {
+        await db.transaction(async (tx) => {
+          await deleteAccountRows(tx, acct.id, acct.email, acct.name);
+        });
+      } catch {
+        await deleteAccountRows(db, acct.id, acct.email, acct.name);
+      }
+      ctx.invalidateQueries();
+      return { ok: true, error: null };
+    },
+  }),
+
   recordGameResult: defineAction({
     description:
       "Saves a finished game to the player's account: games played, total wins, and a story chapter win when one is passed.",
@@ -332,6 +414,9 @@ export const Actions = {
       if (!acct) {
         return { ok: false, error: "Please sign in before buying." };
       }
+      if (isUnder13(acct.birthYear)) {
+        return { ok: false, error: UNDER13_NO_BUY };
+      }
       if (isLiveStripe()) {
         return {
           ok: false,
@@ -386,6 +471,24 @@ export const Actions = {
       live: z.boolean(),
     }),
     async handler(ctx, args) {
+      const db = ctx.db();
+      const acct = await accountByToken(ctx, args.token);
+      if (!acct) {
+        return {
+          ok: false,
+          checkoutUrl: null,
+          error: "Please sign in before buying.",
+          live: isLiveStripe(),
+        };
+      }
+      if (isUnder13(acct.birthYear)) {
+        return {
+          ok: false,
+          checkoutUrl: null,
+          error: UNDER13_NO_BUY,
+          live: isLiveStripe(),
+        };
+      }
       if (!isLiveStripe()) {
         return {
           ok: false,
@@ -400,16 +503,6 @@ export const Actions = {
           ok: false,
           checkoutUrl: null,
           error: "That return address isn't one the game serves.",
-          live: true,
-        };
-      }
-      const db = ctx.db();
-      const acct = await accountByToken(ctx, args.token);
-      if (!acct) {
-        return {
-          ok: false,
-          checkoutUrl: null,
-          error: "Please sign in before buying.",
           live: true,
         };
       }
