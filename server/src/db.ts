@@ -60,6 +60,15 @@ export async function migrate(): Promise<void> {
       "product" text NOT NULL,
       "created_at" timestamp DEFAULT now() NOT NULL
     )`,
+    `CREATE TABLE IF NOT EXISTS "stripe_payments" (
+      "id" serial PRIMARY KEY NOT NULL,
+      "session_id" text NOT NULL,
+      "account_id" integer NOT NULL,
+      "product" text NOT NULL,
+      "amount_cents" integer NOT NULL,
+      "created_at" timestamp DEFAULT now() NOT NULL,
+      CONSTRAINT "stripe_payments_session_id_unique" UNIQUE("session_id")
+    )`,
     `CREATE TABLE IF NOT EXISTS "rooms" (
       "id" serial PRIMARY KEY NOT NULL,
       "code" text NOT NULL,

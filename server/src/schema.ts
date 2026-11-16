@@ -53,6 +53,21 @@ export const purchases = pgTable("purchases", {
     .$defaultFn(() => new Date()),
 });
 
+// Verified Stripe Checkout Sessions, one row per paid session. The
+// session_id is unique so a paid session can only ever unlock a product
+// once, even if the player returns to the game or refreshes.
+export const stripePayments = pgTable("stripe_payments", {
+  id: serial("id").primaryKey(),
+  sessionId: text("session_id").notNull().unique(),
+  accountId: integer("account_id").notNull(),
+  product: text("product").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  createdAt: timestamp("created_at")
+    .notNull()
+    .defaultNow()
+    .$defaultFn(() => new Date()),
+});
+
 export const rooms = pgTable("rooms", {
   id: serial("id").primaryKey(),
   code: text("code").notNull().unique(),

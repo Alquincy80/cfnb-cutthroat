@@ -13,6 +13,14 @@
 import { defineAction, z, type ActionsModule, type Ctx } from "./sdk";
 import { and, desc, eq, gt, lt } from "drizzle-orm";
 import * as schema from "./schema";
+import {
+  PRODUCTS,
+  createCheckoutSession,
+  isAllowedOrigin,
+  isLiveStripe,
+  verifyPaidSession,
+  type ProductId,
+} from "./stripe";
 
 const CURRENT_YEAR = 2026;
 
@@ -311,7 +319,7 @@ export const Actions = {
 
   buyProduct: defineAction({
     description:
-      "Completes a store purchase in Stripe test mode (test card 4242 only, no real charge) and unlocks the product on the player's account.",
+      "Completes a store purchase in Stripe test mode (test card 4242 only, no real charge) and unlocks the product on the player's account. When live Stripe is configured, test buys are refused — real payments go through Stripe Checkout instead.",
     request: z.object({
       token: z.string().min(1),
       product: z.enum(["family_pass", "remove_ads"]),
@@ -323,6 +331,13 @@ export const Actions = {
       const acct = await accountByToken(ctx, args.token);
       if (!acct) {
         return { ok: false, error: "Please sign in before buying." };
+      }
+      if (isLiveStripe()) {
+        return {
+          ok: false,
+          error:
+            "Live payments are on now — pay through Stripe Checkout. No card details are typed in the game.",
+        };
       }
       const digits = args.cardNumber.replace(/\D/g, "");
       if (digits !== "4242424242424242") {
@@ -343,6 +358,192 @@ export const Actions = {
       }
       ctx.invalidateQueries();
       return { ok: true, error: null };
+    },
+  }),
+
+  getStoreStatus: defineAction({
+    description:
+      "Says whether the Store is taking live Stripe payments (STRIPE_SECRET_KEY is set) or is still in test mode with the 4242 test card.",
+    request: z.object({}),
+    response: z.object({ live: z.boolean() }),
+    async handler() {
+      return { live: isLiveStripe() };
+    },
+  }),
+
+  createCheckoutSession: defineAction({
+    description:
+      "Starts a real Stripe Checkout Session for a store product and returns Stripe's hosted checkout URL. Only works when live Stripe is configured; otherwise it reports that live payments are not set up yet and nothing is unlocked.",
+    request: z.object({
+      token: z.string().min(1),
+      product: z.enum(["family_pass", "remove_ads"]),
+      origin: z.string().min(1).max(200),
+    }),
+    response: z.object({
+      ok: z.boolean(),
+      checkoutUrl: z.string().nullable(),
+      error: z.string().nullable(),
+      live: z.boolean(),
+    }),
+    async handler(ctx, args) {
+      if (!isLiveStripe()) {
+        return {
+          ok: false,
+          checkoutUrl: null,
+          error:
+            "Live payments aren't set up yet — the Store is still in test mode.",
+          live: false,
+        };
+      }
+      if (!isAllowedOrigin(args.origin)) {
+        return {
+          ok: false,
+          checkoutUrl: null,
+          error: "That return address isn't one the game serves.",
+          live: true,
+        };
+      }
+      const db = ctx.db();
+      const acct = await accountByToken(ctx, args.token);
+      if (!acct) {
+        return {
+          ok: false,
+          checkoutUrl: null,
+          error: "Please sign in before buying.",
+          live: true,
+        };
+      }
+      const existing = await db
+        .select()
+        .from(schema.purchases)
+        .where(eq(schema.purchases.accountId, acct.id));
+      if (existing.some((p) => p.product === args.product)) {
+        return {
+          ok: false,
+          checkoutUrl: null,
+          error: "You already own that — it's on your account.",
+          live: true,
+        };
+      }
+      try {
+        const url = await createCheckoutSession({
+          accountId: acct.id,
+          email: acct.email,
+          product: args.product,
+          origin: args.origin,
+        });
+        return { ok: true, checkoutUrl: url, error: null, live: true };
+      } catch (err) {
+        console.error(
+          "Stripe Checkout Session failed",
+          err instanceof Error ? err.message : String(err),
+        );
+        return {
+          ok: false,
+          checkoutUrl: null,
+          error:
+            "Stripe couldn't start checkout just now. Try again in a second — no charge was made.",
+          live: true,
+        };
+      }
+    },
+  }),
+
+  confirmCheckout: defineAction({
+    description:
+      "After Stripe redirects a player back to the game, verifies the Checkout Session with Stripe (paid, right product, right amount, tied to this player's account) and only then unlocks the product. A client claim alone never unlocks anything.",
+    request: z.object({
+      token: z.string().min(1),
+      sessionId: z.string().min(1).max(200),
+    }),
+    response: z.object({
+      ok: z.boolean(),
+      error: z.string().nullable(),
+      product: z.enum(["family_pass", "remove_ads"]).nullable(),
+    }),
+    async handler(ctx, args) {
+      if (!isLiveStripe()) {
+        return {
+          ok: false,
+          error: "Live payments aren't set up yet.",
+          product: null,
+        };
+      }
+      const db = ctx.db();
+      const acct = await accountByToken(ctx, args.token);
+      if (!acct) {
+        return {
+          ok: false,
+          error: "Please sign in before finishing checkout.",
+          product: null,
+        };
+      }
+      // Idempotent: a session that was already recorded unlocks nothing twice.
+      const recorded = await db
+        .select()
+        .from(schema.stripePayments)
+        .where(eq(schema.stripePayments.sessionId, args.sessionId))
+        .limit(1);
+      if (recorded[0]) {
+        if (recorded[0].accountId !== acct.id) {
+          return {
+            ok: false,
+            error: "That payment belongs to a different account.",
+            product: null,
+          };
+        }
+        return {
+          ok: true,
+          error: null,
+          product: recorded[0].product as ProductId,
+        };
+      }
+      let verified;
+      try {
+        verified = await verifyPaidSession(args.sessionId);
+      } catch (err) {
+        console.error(
+          "Stripe session verification failed",
+          err instanceof Error ? err.message : String(err),
+        );
+        return {
+          ok: false,
+          error:
+            "Stripe couldn't confirm that payment yet. If you paid, try again in a moment — nothing was unlocked.",
+          product: null,
+        };
+      }
+      if (verified.accountId !== acct.id) {
+        return {
+          ok: false,
+          error: "That payment belongs to a different account.",
+          product: null,
+        };
+      }
+      if (verified.amountCents !== PRODUCTS[verified.product].amountCents) {
+        return {
+          ok: false,
+          error: "That payment amount does not match the product.",
+          product: null,
+        };
+      }
+      await db.insert(schema.stripePayments).values({
+        sessionId: args.sessionId,
+        accountId: acct.id,
+        product: verified.product,
+        amountCents: verified.amountCents,
+      });
+      const existing = await db
+        .select()
+        .from(schema.purchases)
+        .where(eq(schema.purchases.accountId, acct.id));
+      if (!existing.some((p) => p.product === verified.product)) {
+        await db
+          .insert(schema.purchases)
+          .values({ accountId: acct.id, product: verified.product });
+      }
+      ctx.invalidateQueries();
+      return { ok: true, error: null, product: verified.product };
     },
   }),
 
