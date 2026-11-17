@@ -2,7 +2,7 @@
 // original space used (production React, Tailwind plugin, asset naming),
 // without the Hatch SDK build guard.
 
-import { rm } from "node:fs/promises";
+import { cp, rm } from "node:fs/promises";
 import { basename } from "node:path";
 import tailwindPlugin from "bun-plugin-tailwind";
 
@@ -52,4 +52,7 @@ for (const output of result.outputs) {
   }
   if (changed) await Bun.write(output.path, text);
 }
+
+// Copy static public files (robots.txt, sitemap.xml) into dist.
+await cp("./client/public", OUTDIR, { recursive: true }).catch(() => {});
 console.log("Client built to", OUTDIR);
