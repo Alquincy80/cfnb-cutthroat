@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://cfnb-cutthroat.onrender.com/sitemap.xml
