@@ -36,6 +36,7 @@ import {
   startMusic,
   stopMusic,
 } from "./audio";
+import { shareGame } from "./share";
 
 export interface GameConfig {
   mode: "quick" | "story" | "room";
@@ -381,6 +382,21 @@ export function GameTable({
   const [showVoice, setShowVoice] = useState(false);
   const [musicOn, setMusicOn] = useState(() => getMusicEnabled());
   const [sfxOn, setSfxOn] = useState(() => getSfxEnabled());
+  const [shareNote, setShareNote] = useState<string | null>(null);
+  const shareTimer = useRef<number | null>(null);
+
+  async function onShare() {
+    const outcome = await shareGame();
+    if (shareTimer.current) window.clearTimeout(shareTimer.current);
+    setShareNote(
+      outcome === "shared"
+        ? "Shared — thanks for spreading the word! 🎴"
+        : outcome === "copied"
+          ? "Link copied — send it to a friend! 📤"
+          : "Couldn't copy the link — long-press the address bar to copy it.",
+    );
+    shareTimer.current = window.setTimeout(() => setShareNote(null), 4000);
+  }
   const endFired = useRef(false);
 
   // Music must never start on its own (browsers block autoplay) — it only
@@ -1019,10 +1035,22 @@ export function GameTable({
                   >
                     Run it back ▶
                   </button>
+                  <button
+                    type="button"
+                    className="rounded-full bg-[#ffd166] px-5 py-2.5 text-base font-black text-[#431407] shadow ring-2 ring-[#b45309]/40"
+                    onClick={onShare}
+                  >
+                    📤 Send to a Friend
+                  </button>
                   <button type="button" className="rounded-full bg-[var(--bg)] px-5 py-2.5 text-base font-black text-[var(--text)] shadow" onClick={onExit}>
                     Back to the house
                   </button>
                 </div>
+              )}
+              {shareNote && (
+                <p role="status" className="mt-2.5 rounded-full bg-[#fff7e0] px-3 py-1.5 text-center text-sm font-black text-[#431407] ring-1 ring-[#ffd166]">
+                  {shareNote}
+                </p>
               )}
             </div>
           </div>
