@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { SafeAreaTopScrim } from "./SafeAreaTopScrim";
 import { api, type ApiResponse } from "./api";
@@ -12,6 +12,7 @@ unlockedFelts,
 type Difficulty,
 } from "./game";
 import { GameTable, type GameConfig } from "./GameTable";
+import { shareGame } from "./share";
 import { ChatPanel } from "./ChatPanel";
 
 type Profile = ApiResponse<typeof api, "getProfile">;
@@ -771,6 +772,21 @@ function HomeScreen(props: {
 }) {
   const [playerCount, setPlayerCount] = useState<3 | 4>(4);
   const [difficulty, setDifficulty] = useState<Difficulty>("spicy");
+  const [shareNote, setShareNote] = useState<string | null>(null);
+  const shareTimer = useRef<number | null>(null);
+
+  async function onShare() {
+    const outcome = await shareGame();
+    if (shareTimer.current) window.clearTimeout(shareTimer.current);
+    setShareNote(
+      outcome === "shared"
+        ? "Shared — thanks for spreading the word! 🎴"
+        : outcome === "copied"
+          ? "Link copied — send it to a friend! 📤"
+          : "Couldn't copy the link — long-press the address bar to copy it.",
+    );
+    shareTimer.current = window.setTimeout(() => setShareNote(null), 4000);
+  }
   return (
     <div className="pt-4 sm:pt-5">
       {/* ---- Cookout-poster cover ---- */}
@@ -870,6 +886,25 @@ function HomeScreen(props: {
             >
               ♠ Deal &apos;Em — Play! ♠
             </button>
+          </div>
+
+          {/* Send to a Friend — share the game link */}
+          <div className="relative mx-auto mt-3 w-full max-w-sm">
+            <button
+              type="button"
+              onClick={onShare}
+              className="w-full rounded-full bg-[#fff7e0] py-3 text-lg font-black text-[#431407] shadow-lg ring-2 ring-[#ffd166] active:scale-[0.99]"
+            >
+              📤 Send to a Friend
+            </button>
+            {shareNote && (
+              <p
+                role="status"
+                className="mt-2 rounded-full bg-black/40 px-3 py-1.5 text-center text-sm font-black text-[#ffe9b0]"
+              >
+                {shareNote}
+              </p>
+            )}
           </div>
           <p className="mt-3 text-center text-xs font-bold text-white/85">
             Free to play · no sign-up needed · deals the table set up below
