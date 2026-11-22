@@ -227,7 +227,13 @@ const PLAYER_REACTIONS: { emoji: string; label: string }[] = [
 
 type Bubble = { emoji: string; text: string; id: number };
 
-/* ---------- Seat pill: cartoon avatar + name, bid, books, points ---------- */
+/* ---------- Seat portrait: framed cartoon portrait + name plate ----------
+   Like the reference table, every player sits at the table as a framed
+   portrait with a name plate under it and their bid / books / points on
+   the plate. The portrait itself is the character's existing artwork —
+   only the presentation is restyled. The human player's "portrait" is
+   their initial medallion in the same frame. Turn glow is a gold ring
+   around the whole frame; the mood badge rides the frame's corner. */
 function SeatPill({
   seat,
   bid,
@@ -251,57 +257,54 @@ function SeatPill({
 }) {
   const col = layout === "col";
   return (
-    <div className={`${col ? "w-[72px] shrink-0" : ""}`}>
+    <div className={`${col ? "w-[92px] shrink-0" : "w-[140px] shrink-0"}`}>
       <div
-        className={`flex rounded-2xl bg-black/60 shadow-[0_2px_8px_rgba(0,0,0,0.35)] ring-2 backdrop-blur-[2px] transition-shadow duration-300 ${
-          col ? "flex-col items-center px-0.5 py-px" : "items-center gap-1 px-1.5 py-px"
-        } ${isTurn ? "shadow-[0_0_0_1px_rgba(180,83,9,0.7),0_0_14px_rgba(255,209,102,0.8)] ring-[#ffcf33]" : isWinning ? "ring-emerald-200" : "ring-white/40"}`}
+        className={`flex flex-col items-center rounded-xl bg-[#3a2413]/95 px-1.5 pb-1.5 pt-1.5 shadow-[0_3px_10px_rgba(0,0,0,0.45)] transition-shadow duration-300 ${
+          isTurn
+            ? "shadow-[0_0_0_2px_#ffcf33,0_0_16px_rgba(255,209,102,0.85)] ring-2 ring-[#ffcf33]"
+            : isWinning
+              ? "ring-2 ring-emerald-300"
+              : "ring-2 ring-[#a67c3d]"
+        }`}
       >
-        <div className="relative shrink-0">
+        {/* Framed portrait */}
+        <div className="relative shrink-0 rounded-lg border-[3px] border-[#c9a227] bg-[#221812] p-[2px] shadow-[inset_0_0_0_1px_#7a5c14,0_2px_6px_rgba(0,0,0,0.5)]">
           {seat.character?.img ? (
             <img
               src={seat.character.img}
               alt={`Portrait of ${seat.name}`}
-              className="h-[22px] w-[22px] select-none rounded-full object-cover shadow-md ring-2 ring-white"
+              className="h-[52px] w-[52px] select-none rounded-[5px] object-cover"
               style={{ filter: "contrast(1.07) saturate(1.08)" }}
               draggable={false}
             />
           ) : (
             <div
-              className="flex h-[22px] w-[22px] items-center justify-center rounded-full bg-gradient-to-br from-[#ffd166] to-[#ff6b35] text-[11px] font-black text-[#431407] shadow-md ring-2 ring-white"
+              className="flex h-[52px] w-[52px] items-center justify-center rounded-[5px] bg-gradient-to-br from-[#ffd166] to-[#ff6b35] text-[24px] font-black text-[#431407]"
               aria-label={`Your seat at the table`}
             >
               {seat.name.slice(0, 1).toUpperCase()}
             </div>
           )}
           <span
-            className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-white text-[9px] shadow-md ring-1 ring-[#b8912a]"
+            className="absolute -bottom-1.5 -right-1.5 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-white text-[10px] shadow-md ring-1 ring-[#b8912a]"
             aria-hidden="true"
             title="Current expression"
           >
             {mood}
           </span>
           {reaction && (
-            <span className="absolute -left-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-white text-[9px] shadow-md ring-2 ring-[#ffd166] motion-safe:animate-bounce" aria-hidden="true">
+            <span className="absolute -left-1.5 -top-1.5 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-white text-[10px] shadow-md ring-2 ring-[#ffd166] motion-safe:animate-bounce" aria-hidden="true">
               {reaction}
             </span>
           )}
         </div>
-        {col ? (
-          <div className="w-full text-center">
-            <p className="text-[9px] font-black leading-tight text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.65)]">{seat.name}</p>
-            <p className="text-[8px] font-bold leading-tight text-white/95 [text-shadow:0_1px_2px_rgba(0,0,0,0.6)]">
-              Bid {bid ?? "–"} · Bk {books} · {score} pts
-            </p>
-          </div>
-        ) : (
-          <div className="min-w-0 text-left">
-            <p className="max-w-[150px] truncate text-[12px] font-black leading-tight text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.65)]">{seat.name}</p>
-            <p className="text-[9px] font-bold leading-tight text-white/95 [text-shadow:0_1px_2px_rgba(0,0,0,0.6)]">
-              Bid {bid ?? "–"} · Books {books} · {score} pts
-            </p>
-          </div>
-        )}
+        {/* Name plate */}
+        <p className="mt-1.5 w-full truncate rounded-md bg-[#221812] px-1.5 py-0.5 text-center text-[11px] font-black leading-tight text-[#ffd166] ring-1 ring-[#a67c3d]">
+          {seat.name}
+        </p>
+        <p className="mt-0.5 text-center text-[9px] font-bold leading-tight text-[#f5e6c8]">
+          Bid {bid ?? "–"} · Books {books} · {score} pts
+        </p>
       </div>
     </div>
   );
@@ -769,10 +772,13 @@ export function GameTable({
         </span>
       </div>
 
-      {/* ===== THE TABLE: cream frame, gold trim, deep emerald felt ===== */}
+      {/* ===== THE TABLE: warm wood planks, brass trim, wooden playing surface ===== */}
       <div
-        className="relative rounded-[2rem] bg-[#fdf6ec] p-[3px] shadow-2xl sm:p-1"
-        style={{ boxShadow: "0 0 0 1px #7a5c14, 0 0 0 4px #e6c65c, 0 0 0 5px #8a6d1f, 0 24px 48px rgba(0,0,0,0.42)" }}
+        className="relative rounded-[2rem] p-[5px] shadow-2xl sm:p-1.5"
+        style={{
+          background: "repeating-linear-gradient(90deg,#7a4e28 0 46px,#5d3a1e 46px 48px,#8a5a33 48px 94px,#5d3a1e 94px 96px)",
+          boxShadow: "0 0 0 1px #3a2413, 0 0 0 4px #a67c3d, 0 0 0 5px #5d3a1e, 0 24px 48px rgba(0,0,0,0.42)",
+        }}
       >
         <div
           className="relative rounded-[1.6rem] shadow-[inset_0_1px_0_rgba(255,255,255,0.18),inset_0_0_24px_rgba(0,0,0,0.18)] ring-2 ring-[#c9a227]"
@@ -812,7 +818,7 @@ export function GameTable({
               )}
             </div>
 
-            {/* 3 — Opponent seat pills: one row of their own above the ring,
+            {/* 3 — Opponent seat portraits: one row of their own above the ring,
                 spread across the width, clear of the table */}
             {n === 4 ? (
               <div className="flex items-start justify-between gap-2 px-0.5">
@@ -832,10 +838,10 @@ export function GameTable({
               <div
                 className="shrink-0 rounded-full p-1 sm:p-2"
                 style={{
-                  background: "radial-gradient(circle, rgba(255,255,255,0.09) 0%, rgba(0,0,0,0.14) 78%)",
-                  border: "4px solid #e6c65c",
+                  background: "radial-gradient(circle, rgba(255,220,160,0.07) 0%, rgba(0,0,0,0.16) 78%)",
+                  border: "4px solid #a67c3d",
                   boxShadow:
-                    "inset 0 0 0 2px rgba(122,92,20,0.55), inset 0 0 0 6px rgba(0,0,0,0.2), inset 0 0 0 10px #c9a227, inset 0 0 0 12px rgba(122,92,20,0.9), 0 0 0 1px rgba(122,92,20,0.65), 0 2px 10px rgba(0,0,0,0.3)",
+                    "inset 0 0 0 2px rgba(58,36,19,0.7), inset 0 0 0 6px rgba(0,0,0,0.2), inset 0 0 0 10px #7a5c14, inset 0 0 0 12px rgba(58,36,19,0.9), 0 0 0 1px rgba(58,36,19,0.65), 0 2px 10px rgba(0,0,0,0.3)",
                 }}
               >
                 <div className="grid grid-cols-3 grid-rows-3 items-center justify-items-center gap-1" aria-label="Cards played on the table">
@@ -892,7 +898,7 @@ export function GameTable({
               </div>
             </div>
 
-            {/* 5 — Your seat pill, own row below the ring */}
+            {/* 5 — Your seat portrait, own row below the ring */}
             <div className="flex justify-center">{renderPill(0, "row")}</div>
 
             {/* 6 — Bid picker, compact single row of its own (not inside the ring, not over any card) */}

@@ -198,7 +198,7 @@ export const DECKS: DeckStyle[] = [
 ];
 
 export const FELTS: { id: string; name: string; css: string; how: string }[] = [
-  { id: "classic-green", name: "Classic Green", css: "radial-gradient(ellipse at center, #1e7a3c 0%, #14532d 70%)", how: "Everyone starts here" },
+  { id: "classic-green", name: "Classic Wood", css: "radial-gradient(ellipse at center, rgba(255,214,150,0.12) 0%, rgba(0,0,0,0.20) 100%), repeating-linear-gradient(180deg,#8a5a33 0px 40px,#5d3a1e 40px 42px,#7a4e28 42px 82px,#5d3a1e 82px 84px,#96683c 84px 124px,#5d3a1e 124px 126px)", how: "Everyone starts here" },
   { id: "porch", name: "Porch Boards", css: "repeating-linear-gradient(90deg,#8a5a33 0 34px,#7c4f2b 34px 68px)", how: "Win Story Chapter 2" },
   { id: "sunset", name: "Cookout Sunset", css: "radial-gradient(ellipse at center, #b45309 0%, #7c2d12 75%)", how: "Win Story Chapter 3" },
   { id: "garage", name: "Garage Concrete", css: "radial-gradient(ellipse at center, #4b5563 0%, #1f2937 75%)", how: "Win Story Chapter 4" },
