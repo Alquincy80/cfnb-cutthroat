@@ -25,6 +25,7 @@ type View =
   | "rules"
   | "account"
   | "look"
+  | "rewards"
   | "privacy"
   | "terms"
   | "safety";
@@ -285,6 +286,7 @@ export function App() {
             onRules={() => setView("rules")}
             onAccount={() => setView("account")}
             onLook={() => setView("look")}
+            onRewards={() => setView("rewards")}
             onPrivacy={() => setView("privacy")}
             onTerms={() => setView("terms")}
             onSafety={() => setView("safety")}
@@ -397,6 +399,17 @@ export function App() {
             myDecks={myDecks}
             myFelts={myFelts}
             onChange={setLook}
+            onBack={() => setView("home")}
+          />
+        )}
+        {view === "rewards" && (
+          <RewardsScreen
+            deckId={look.deckId}
+            myDecks={myDecks}
+            chapters={chapters}
+            totalWins={totalWins}
+            hasPass={hasPass}
+            onEquip={(deckId) => setLook({ deckId, feltId: look.feltId })}
             onBack={() => setView("home")}
           />
         )}
@@ -766,6 +779,7 @@ function HomeScreen(props: {
   onRules: () => void;
   onAccount: () => void;
   onLook: () => void;
+  onRewards: () => void;
   onPrivacy: () => void;
   onTerms: () => void;
   onSafety: () => void;
@@ -1007,6 +1021,12 @@ function HomeScreen(props: {
           sub="Card backs & table felts"
           emoji="🎨"
           onClick={props.onLook}
+        />
+        <MenuButton
+          title="Rewards"
+          sub="Earn card styles by winning"
+          emoji="🏆"
+          onClick={props.onRewards}
         />
         <MenuButton
           title={props.signedIn ? "My Account" : "Sign In / Sign Up"}
@@ -2163,6 +2183,195 @@ function LookScreen(props: {
           );
         })}
       </div>
+    </section>
+  );
+}
+
+// ---------- Rewards ----------
+// Shows every earnable card style with its exact unlock rule (mirroring
+// unlockedDecks in game.ts), the player's progress toward it, and lets the
+// player equip any style they have earned. Free unlocks only — no purchases,
+// no prizes.
+
+const CHAPTER_STYLE_CHAPTER: Record<string, number> = {
+  classic: 1,
+  crimson: 2,
+  diamond: 5,
+  stars: 6,
+  emerald: 7,
+  crown: 8,
+};
+
+const WIN_STYLE_WINS: Record<string, number> = {
+  win1: 1,
+  win2: 2,
+  win5: 5,
+};
+
+function RewardsScreen(props: {
+  deckId: string;
+  myDecks: string[];
+  chapters: number[];
+  totalWins: number;
+  hasPass: boolean;
+  onEquip: (deckId: string) => void;
+  onBack: () => void;
+}) {
+  const earned = props.myDecks.length;
+  const chapterStyles = DECKS.filter((d) => d.id in CHAPTER_STYLE_CHAPTER);
+  const winStyles = DECKS.filter((d) => d.id in WIN_STYLE_WINS);
+  const house = DECKS.find((d) => d.id === "house");
+
+  function chapterProgress(n: number): string {
+    const name = CHAPTERS.find((c) => c.n === n)?.name ?? `Chapter ${n}`;
+    return props.chapters.includes(n)
+      ? `✅ Chapter ${n} won — ${name}`
+      : `Win Chapter ${n} — ${name}`;
+  }
+
+  function winProgress(need: number): string {
+    return props.totalWins >= need
+      ? `✅ ${need} win${need > 1 ? "s" : ""} — earned`
+      : `${props.totalWins} of ${need} win${need > 1 ? "s" : ""} so far`;
+  }
+
+  function rewardCard(d: (typeof DECKS)[number], progress: string) {
+    const owned = props.myDecks.includes(d.id);
+    const active = props.deckId === d.id;
+    return (
+      <button
+        key={d.id}
+        type="button"
+        disabled={!owned}
+        aria-pressed={active}
+        onClick={() => props.onEquip(d.id)}
+        className={`rounded-3xl bg-[var(--surface)] p-3 text-left shadow ${active ? "ring-4 ring-[#f5b942]" : ""} ${owned ? "" : "opacity-55"}`}
+      >
+        <span
+          className="block h-16 rounded-xl border border-black/10"
+          style={{ background: d.back }}
+          aria-hidden="true"
+        />
+        <span className="mt-2 block text-sm font-black text-[var(--text)]">
+          {d.name} {active && "· in use"}
+        </span>
+        <span className="block text-xs font-semibold text-[var(--dim)]">
+          {owned ? `✅ Earned — tap to use` : `🔒 ${d.how}`}
+        </span>
+        <span className="block text-xs font-semibold text-[var(--dim)]">
+          {progress}
+        </span>
+      </button>
+    );
+  }
+
+  return (
+    <section className="pt-4">
+      <BackBar title="Rewards" onBack={props.onBack} />
+      <div
+        className="mt-2 rounded-3xl p-4 shadow"
+        style={{
+          background:
+            "linear-gradient(165deg, #8a5a33 0%, #7a4e28 55%, #5d3a1e 100%)",
+        }}
+      >
+        <p className="text-lg font-black text-[#fff8ec]">
+          🏆 {earned} of {DECKS.length} card styles earned
+        </p>
+        <p className="mt-1 text-sm font-semibold text-[#ffe9c4]">
+          {props.chapters.length}/8 Story chapters won · {props.totalWins}{" "}
+          total win{props.totalWins === 1 ? "" : "s"}
+        </p>
+        <p className="mt-1 text-xs font-semibold text-[#ffe9c4]">
+          Win chapters and games to unlock them all — free to earn, no
+          purchases, no prizes.
+          {props.hasPass ? " Family Pass open — every style is yours." : ""}
+        </p>
+      </div>
+      <h3 className="mt-5 text-lg font-black text-[var(--text)]">
+        Story Mode ladder
+      </h3>
+      <p className="mt-1 text-sm text-[var(--dim)]">
+        Climb the chapters — win one to open the next.
+      </p>
+      <ol className="mt-2 space-y-2">
+        {CHAPTERS.map((ch) => {
+          const won = props.chapters.includes(ch.n);
+          const prevWon = ch.n === 1 || props.chapters.includes(ch.n - 1);
+          const current = !won && prevWon;
+          return (
+            <li
+              key={ch.n}
+              className={`flex items-start gap-3 rounded-3xl bg-[var(--surface)] p-3 shadow ${current ? "ring-4 ring-[#f5b942]" : ""} ${won ? "" : "opacity-70"}`}
+            >
+              <span
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base font-black"
+                style={{
+                  background: won
+                    ? "#166534"
+                    : current
+                      ? "#f5b942"
+                      : "#78716c",
+                  color: "#fff8ec",
+                }}
+                aria-hidden="true"
+              >
+                {won ? "✓" : ch.n}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-black text-[var(--text)]">
+                  Chapter {ch.n} — {ch.name}{" "}
+                  {current && (
+                    <span className="text-[#b45309]">· You&rsquo;re here</span>
+                  )}
+                  {won && (
+                    <span className="text-[#166534]">· Cleared</span>
+                  )}
+                  {!won && !current && <span>· Locked</span>}
+                </span>
+                <span className="block text-xs font-semibold text-[var(--dim)]">
+                  {ch.room}
+                </span>
+                <span className="block text-xs font-semibold text-[var(--dim)]">
+                  Win unlocks: {ch.unlock}
+                </span>
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+      <h3 className="mt-5 text-lg font-black text-[var(--text)]">
+        Story chapter rewards
+      </h3>
+      <p className="mt-1 text-sm text-[var(--dim)]">
+        Win each Story chapter to earn its card style.
+      </p>
+      <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {chapterStyles.map((d) =>
+          rewardCard(d, chapterProgress(CHAPTER_STYLE_CHAPTER[d.id] as number)),
+        )}
+      </div>
+      <h3 className="mt-6 text-lg font-black text-[var(--text)]">
+        Game win rewards
+      </h3>
+      <p className="mt-1 text-sm text-[var(--dim)]">
+        Win games — Quick Play, Story, or Family Rooms — to earn these.
+      </p>
+      <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {winStyles.map((d) =>
+          rewardCard(d, winProgress(WIN_STYLE_WINS[d.id] as number)),
+        )}
+      </div>
+      {house && (
+        <>
+          <h3 className="mt-6 text-lg font-black text-[var(--text)]">
+            Starting style
+          </h3>
+          <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {rewardCard(house, "Yours — everyone starts here")}
+          </div>
+        </>
+      )}
     </section>
   );
 }
